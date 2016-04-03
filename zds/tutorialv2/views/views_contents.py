@@ -191,7 +191,7 @@ class DisplayContent(LoginRequiredMixin, SingleContentDetailViewMixin):
 
         context['gallery'] = self.object.gallery
         context['public_content_object'] = self.public_content_object
-        
+
         return context
 
 
