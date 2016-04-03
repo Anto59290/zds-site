@@ -133,6 +133,15 @@
         </form>
     {% endwith %}
     </li>
+    <li>
+    {% if not user in content.authors.all %}
+        {% blocktrans count counter=content.authors.all|length %}
+            <a href="{{ pm_link }}">Contacter l'auteur par MP</a>
+        {% plural %}
+            <a href="{{ pm_link }}">"Contacter les auteurs par MP</a>
+        {% endblocktrans %}
+    {% endif %}
+    </li>	
 
 {% endblock %}
 

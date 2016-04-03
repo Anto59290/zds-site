@@ -175,7 +175,7 @@ class PublishableContent(models.Model):
         return ''
 
     def get_absolute_contact_url(self, title=u'Collaboration'):
-        """ Get url to send a new PM for collaboration
+        """ Get url to send a new PM to the authors of content
 
         :param title: what is going to be in the title of the PM before the name of the content
         :type title: str
