@@ -99,7 +99,8 @@ class Image(models.Model):
     title = models.CharField(_(u'Titre'), max_length=80)
     slug = models.SlugField(max_length=80)
     physical = ThumbnailerImageField(upload_to=image_path, max_length=200)
-    legend = models.CharField(_(u'Légende'), max_length=80, null=True, blank=True)
+    alttext = models.CharField(_(u'Texte alternatif'), max_length=80, null=True, blank=True)
+    legend = models.CharField(_(u'Légende'), max_length=256, null=True, blank=True)
     pubdate = models.DateTimeField(_(u'Date de création'), auto_now_add=True, db_index=True)
     update = models.DateTimeField(_(u'Date de modification'), null=True, blank=True)
 
@@ -188,12 +189,12 @@ class Gallery(models.Model):
         return UserGallery.objects.filter(gallery=self).all()
 
     def get_images(self):
-        """Get all images in the gallery, ordered by publication date.
+        """Get all images in the gallery, ordered by title.
 
         :return: all images in the gallery
         :rtype: QuerySet
         """
-        return Image.objects.filter(gallery=self).order_by('pubdate').all()
+        return Image.objects.filter(gallery=self).order_by('title').all()
 
     def get_last_image(self):
         """Get the last image added in the gallery.

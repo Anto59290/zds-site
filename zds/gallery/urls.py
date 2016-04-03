@@ -18,7 +18,7 @@ urlpatterns = [
     url(r'^image/importer/(?P<pk_gallery>\d+)/$', ImportImages.as_view(), name='gallery-image-import'),
 
     # View a gallery
-    url(r'^(?P<pk>\d+)/(?P<slug>.+)/$', GalleryDetails.as_view(), name='gallery-details'),
+	url(r'^(?P<pk>\d+)/(?P<slug>.+)/$', GalleryDetails.as_view(), name='gallery-details'),
 
     # edit a gallery
     url(r'^editer/(?P<pk>\d+)/(?P<slug>.+)/$', EditGallery.as_view(), name='gallery-edit'),
