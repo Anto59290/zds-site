@@ -462,7 +462,6 @@ ZDS_APP = {
     'gallery': {
         'image_max_size': 1024 * 1024,
         'gallery_per_page': 21,
-        'image_per_page': 4,
     },
     'article': {
         'home_number': 4,

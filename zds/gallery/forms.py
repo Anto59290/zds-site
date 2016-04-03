@@ -123,7 +123,7 @@ class ImageForm(forms.ModelForm):
     class Meta:
         model = Image
 
-        fields = ['title', 'legend', 'alttext']
+        fields = ['title', 'legend']
 
     physical = forms.ImageField(
         label=_(u'Sélectionnez votre image'),
@@ -140,7 +140,6 @@ class ImageForm(forms.ModelForm):
         self.helper.layout = Layout(
             Field('title'),
             Field('legend'),
-            Field('alttext'),
             Field('physical'),
             ButtonHolder(
                 StrictButton(_('Ajouter'), type='submit'),
@@ -173,7 +172,6 @@ class UpdateImageForm(ImageForm):
         self.helper.layout = Layout(
             Field('title'),
             Field('legend'),
-            Field('alttext'),
             Field('physical'),
             ButtonHolder(
                 StrictButton(_(u'Mettre à jour'), type='submit'),

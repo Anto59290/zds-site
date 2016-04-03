@@ -21,7 +21,6 @@ from zds.gallery.forms import ArchiveImageForm, ImageForm, UpdateImageForm, \
 from zds.gallery.models import UserGallery, Image, Gallery
 from zds.member.decorator import can_write_and_read_now
 from zds.utils import slugify
-from zds.utils.paginator import ZdSPagingListView
 from django.core.exceptions import ObjectDoesNotExist
 
 from django.core.files import File
@@ -30,19 +29,17 @@ import shutil
 import os
 from django.utils.translation import ugettext_lazy as _
 
-from django.views.generic.detail import SingleObjectMixin
-from django.views.generic import DetailView, CreateView, UpdateView, DeleteView, FormView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, FormView
 from django.utils.decorators import method_decorator
 from zds.tutorialv2.models.models_database import PublishableContent
 
 
-class ListGallery(ZdSPagingListView):
+class ListGallery(ListView):
     """Display the gallery list with all their images"""
 
     object = UserGallery
     template_name = "gallery/gallery/list.html"
     context_object_name = "user_galleries"
-    paginate_by = settings.ZDS_APP['gallery']['gallery_per_page']
 
     @method_decorator(login_required)
     def dispatch(self, *args, **kwargs):
@@ -126,35 +123,27 @@ def ensure_user_access(gallery, user, can_write=False):
     return user_gallery
 
 
-class GalleryDetails(ZdSPagingListView, SingleObjectMixin):
+class GalleryDetails(DetailView):
     """Gallery details"""
 
     model = Gallery
     template_name = "gallery/gallery/details.html"
     context_object_name = "gallery"
-    paginate_by = 2
-    object = None
 
     @method_decorator(login_required)
     def dispatch(self, *args, **kwargs):
-        self.object = self.get_object()
         return super(GalleryDetails, self).dispatch(*args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super(GalleryDetails, self).get_context_data(**kwargs)
-        context.update({
-            'gallery': self.object,
-        })
-		
-		
+
         context['gallery_mode'] = ensure_user_access(self.object, self.request.user)
         context['images'] = self.object.get_images()
         context['form'] = UserGalleryForm
         context['content_linked'] = PublishableContent.objects.filter(gallery__pk=self.object.pk).first()
-        context['gal_pk']=2
 
-		
         return context
+
 
 class EditGallery(UpdateView):
     """Update gallery information"""
@@ -321,11 +310,6 @@ class NewImage(GalleryMixin, CreateView):
             img.legend = form.cleaned_data['legend']
         else:
             img.legend = img.title
-			
-        if form.cleaned_data['alttext'] and form.cleaned_data['alttext'] != '':
-            img.alttext = form.cleaned_data['alttext']
-        else:
-            img.alttext = img.title
 
         img.physical = self.request.FILES['physical']
         img.pubdate = datetime.now()
@@ -384,7 +368,6 @@ class EditImage(GalleryMixin, UpdateView):
         if can_change:
             img.title = form.cleaned_data['title']
             img.legend = form.cleaned_data['legend']
-            img.alttext = form.cleaned_data['alttext']
             img.update = datetime.now()
             img.save()
 
@@ -477,7 +460,7 @@ class ImportImages(GalleryMixin, FormView):
 
             # create picture in database:
             f_im = File(open(ph_temp, "rb"))
-            f_im.name = title + ext
+            f_im.name = title
 
             pic = Image()
             pic.gallery = gallery
