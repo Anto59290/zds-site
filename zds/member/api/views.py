@@ -47,11 +47,15 @@ class MemberListAPI(ListCreateAPIView, ProfileCreate, TokenGenerator):
     """
     Profile resource to list and register.
     """
+<<<<<<< HEAD
     
+=======
+>>>>>>> 6a3360206fc58a6cebf40b611349bbf0ab6264b7
     queryset = Profile.objects.all_members_ordered_by_date_joined()
     filter_backends = (filters.SearchFilter,)
     search_fields = ('user__username',)
     list_key_func = PagingSearchListKeyConstructor()
+
 
     @etag(list_key_func)
     @cache_response(key_func=list_key_func)
@@ -77,6 +81,7 @@ class MemberListAPI(ListCreateAPIView, ProfileCreate, TokenGenerator):
             - code: 404
               message: Not Found
         """
+
         return self.list(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -112,17 +117,28 @@ class ContactableMemberListAPI(ListCreateAPIView, ProfileCreate, TokenGenerator)
     """
     Profile resource to list and register.
     """
+<<<<<<< HEAD
     
+=======
+>>>>>>> 6a3360206fc58a6cebf40b611349bbf0ab6264b7
     queryset = Profile.objects.contactable_members()
     filter_backends = (filters.SearchFilter,)
     search_fields = ('user__username',)
     list_key_func = PagingSearchListKeyConstructor()
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6a3360206fc58a6cebf40b611349bbf0ab6264b7
     @etag(list_key_func)
     @cache_response(key_func=list_key_func)
     def get(self, request, *args, **kwargs):
         """
+<<<<<<< HEAD
         Lists all contactable users in the system.
+=======
+        Lists all users in the system.
+>>>>>>> 6a3360206fc58a6cebf40b611349bbf0ab6264b7
         ---
 
         parameters:
@@ -142,6 +158,10 @@ class ContactableMemberListAPI(ListCreateAPIView, ProfileCreate, TokenGenerator)
             - code: 404
               message: Not Found
         """
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6a3360206fc58a6cebf40b611349bbf0ab6264b7
         return self.list(request, *args, **kwargs)
 
     def get_serializer_class(self):
