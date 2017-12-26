@@ -27,6 +27,7 @@
   "homepage": "https://github.com/zestedesavoir/zds-site",
   "dependencies": {
     "autoprefixer": "7.1.2",
+    "chart.js": "^2.7.1",
     "cookies-eu-banner": "^1.2.10",
     "cssnano": "3.10.0",
     "del": "3.0.0",
@@ -39,6 +40,7 @@
     "gulp-uglify": "3.0.0",
     "gulp.spritesmith": "6.5.1",
     "jquery": "3.2.1",
+    "moment": "^2.20.1",
     "normalize.css": "7.0.0"
   },
   "devDependencies": {
