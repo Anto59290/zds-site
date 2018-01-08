@@ -1,5 +1,5 @@
 import shutil
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from datetime import datetime
 from urllib.request import urlretrieve
 from urllib.parse import urlparse
@@ -962,3 +962,6 @@ class BadArchiveError(Exception):
 
     def __init__(self, reason):
         self.message = reason
+
+
+NamedUrl = namedtuple('NamedUrl', ['name', 'url'])
