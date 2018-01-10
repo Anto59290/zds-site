@@ -1127,7 +1127,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         # Build the service object.
         analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
 
-        if display_mode == 'global':
+        if display_mode in ('global', 'details'):
 
             # TODO remove that line, just for Eskimon's debug purpose...
             urls = '/tutoriels/686/arduino-premiers-pas-en-informatique-embarquee/'
@@ -1192,9 +1192,8 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_display_mode(self, urls):
         # TODO make display_mode an enum ?
-        # TODO hide form and all when content only have one URL
-        # if len(urls) == 1:
-            # return 'details'
+        if len(urls) == 1:
+            return 'details'
         if len(urls) == len(self.get_content_urls()):
             return 'global'
         return 'comparison'
