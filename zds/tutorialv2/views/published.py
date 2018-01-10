@@ -1081,7 +1081,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     def post(self, *args, **kwargs):
         self.public_content_object = self.get_public_object()
         self.versioned_object = self.get_versioned_object()
-        # TODO missing self.objec here !
+        # TODO missing self.object here !
         return super().post(*args, **kwargs)
 
     def get_form_kwargs(self):
@@ -1103,14 +1103,14 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_content_urls(self):
         content = self.versioned_object
-        urls = [NamedUrl(content.title, content.get_absolute_url_online())]
+        urls = [NamedUrl(content.title, content.get_absolute_url_online(), 0)]
         if content.has_extracts():
             return urls
         for child in content.children:
-            urls.append(NamedUrl(child.title, child.get_absolute_url_online()))
+            urls.append(NamedUrl(child.title, child.get_absolute_url_online(), 1))
             if not child.has_extracts():
                 for subchild in child.children:
-                    urls.append(NamedUrl(subchild.title, subchild.get_absolute_url_online()))
+                    urls.append(NamedUrl(subchild.title, subchild.get_absolute_url_online(), 2))
         return urls
 
     def get_cumulative_stats_by_url(self, urls, start, end):
@@ -1153,11 +1153,12 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         nb_days = (end - start).days
         api_raw = []
 
+        # Could raise JSONDecodeError is file is not properly formated
         credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
         http = credentials.authorize(Http(cache=self.CACHE_PATH))
         analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
 
-        if display_mode == 'global':
+        if display_mode in ('global', 'details'):
             response = analytics.reports().batchGet(
                 body={'reportRequests': [{
                     'viewId': self.VIEW_ID,
@@ -1193,7 +1194,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         else:
             for url in urls:
                 stats = [{'date': (start + timedelta(i)).strftime("%Y-%m-%d"),
-                          property: randint(0, 150)} for i in range(nb_days)]
+                          'property_name': randint(0, 150)} for i in range(nb_days)]
                 element = {'label': url.name, 'stats': stats}
                 api_raw.append(element)
         return api_raw
@@ -1214,16 +1215,20 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         # Maybe give a warning message to user ?
         return start_date, end_date
 
+    def get_display_mode(self, urls):
+        # TODO make display_mode an enum ?
+        if len(urls) == 1:
+            return 'details'
+        if len(urls) == len(self.get_content_urls()):
+            return 'global'
+        return 'comparison'
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         urls = self.get_urls_to_render()
         start_date, end_date = self.get_start_and_end_dates()
-
-        # TODO masquer les choses qui n'ont pas de sens quand il n'y a pas de sous parties
-        # Par exemple sur un article --> une seule url, donc pas possible de poster le form
-        display_mode = 'global' if len(urls) == len(self.get_content_urls()) else 'comparison' # TODO make display_mode an enum ?
+        display_mode = self.get_display_mode(urls)
         stats = self.get_stats(urls, start_date, end_date, display_mode=display_mode)
-
         context.update({
                 'display': display_mode,
                 'urls': urls,

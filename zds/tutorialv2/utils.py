@@ -964,4 +964,4 @@ class BadArchiveError(Exception):
         self.message = reason
 
 
-NamedUrl = namedtuple('NamedUrl', ['name', 'url'])
+NamedUrl = namedtuple('NamedUrl', ['name', 'url', 'level'])
