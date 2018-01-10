@@ -1055,11 +1055,27 @@ class TagsListView(ListView):
         return context
 
 
-from random import randint # TODO only for dev, remove me !
+# TODO move imports
+from datetime import date, timedelta
+from zds.tutorialv2.forms import ContentCompareStatsURLForm
+from random import randint
+
+from oauth2client.service_account import ServiceAccountCredentials
+from apiclient.discovery import build
+import httplib2
+from httplib2 import Http
+from oauth2client import client
+from oauth2client import file
+from oauth2client import tools
+
 class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     template_name = 'tutorialv2/stats/index.html'
     form_class = ContentCompareStatsURLForm
     urls = []
+    SCOPES = ['https://www.googleapis.com/auth/analytics.readonly']
+    DISCOVERY_URI = 'https://analyticsreporting.googleapis.com/$discovery/rest'
+    CLIENT_SECRETS_PATH = os.path.join(settings.BASE_DIR, 'api_analytics_secrets.json')  # Path to client_secrets.json file.
+    VIEW_ID = 'ga:86962671'
 
     def post(self, *args, **kwargs):
         self.public_content_object = self.get_public_object()
@@ -1098,23 +1114,65 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_cumulative_stats_by_url(self, urls):
         # TODO some Eskimon's magic here
+
         return [{'url': url, 'pageviews': 1800, 'avgTimeOnPage': 150} for url in urls]
 
-    def get_stats(self, urls, start, end, property, display_mode):
+    def get_stats(self, urls, start, end, display_mode):
         nb_days = (end - start).days
         api_raw = []
 
+        # Could raise JSONDecodeError is file is not properly formated
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
+        http = credentials.authorize(Http())
+        # Build the service object.
+        analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
+
         if display_mode == 'global':
-            stats = [{'date': (start + timedelta(i)).strftime("%Y-%m-%d"),
-                      property: randint(100, 1500)} for i in range(nb_days)]
-            api_raw = [{'label': _('Global'), 'stats': stats}]
+
+            # TODO remove that line, just for Eskimon's debug purpose...
+            urls = '/tutoriels/686/arduino-premiers-pas-en-informatique-embarquee/'
+
+            response = analytics.reports().batchGet(
+                body={'reportRequests': [{
+                    'viewId': self.VIEW_ID,
+                    'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
+                    'metrics': [{'expression': 'ga:pageviews'},
+                                {'expression': 'ga:avgTimeOnPage'}],
+                    'dimensions': [{'name': 'ga:date'},
+                                   {'name': 'ga:pagePath'}],
+                    'dimensionFilterClauses': [{'filters':
+                        [{
+                            'operator': 'EXACT',
+                            'dimensionName': 'ga:pagePath',
+                            'expressions': [urls]
+                        }]}],
+                }]
+                }
+            ).execute()
+
+            data = response['reports'][0]['data']['rows']
+            stat_pageviews = []
+            stat_avgtimeonpage = []
+            for d in data:
+                data_date = d['dimensions'][0]
+                data_date = '{}-{}-{}'.format(data_date[0:4], data_date[4:6], data_date[6:8])
+                data_pageviews = d['metrics'][0]['values'][0]
+                data_avgtimeonpage = d['metrics'][0]['values'][1]
+                stat_pageviews.append({'date': data_date, 'pageviews': data_pageviews})
+                stat_avgtimeonpage.append({'date': data_date, 'avgTimeOnPage': data_avgtimeonpage})
+            print(stat_pageviews)
+            print(stat_avgtimeonpage)
+
+            api_raw = [{'label': _('Global'),
+                        'pageviews': stat_pageviews,
+                        'avgTimeOnPage': stat_avgtimeonpage}]
         else:
             for url in urls:
                 stats = [{'date': (start + timedelta(i)).strftime("%Y-%m-%d"),
-                          property: randint(0, 150)} for i in range(nb_days)]
+                          'property_name': randint(0, 150)} for i in range(nb_days)]
                 element = {'label': url.name, 'stats': stats}
                 api_raw.append(element)
-        return  api_raw
+        return api_raw
 
     def get_start_and_end_dates(self):
         start_date = self.request.GET.get('start_date', None)
@@ -1134,8 +1192,9 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_display_mode(self, urls):
         # TODO make display_mode an enum ?
-        if len(urls) == 1:
-            return 'details'
+        # TODO hide form and all when content only have one URL
+        # if len(urls) == 1:
+            # return 'details'
         if len(urls) == len(self.get_content_urls()):
             return 'global'
         return 'comparison'
@@ -1145,14 +1204,11 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         urls = self.get_urls_to_render()
         start_date, end_date = self.get_start_and_end_dates()
         display_mode = self.get_display_mode(urls)
-        pageviews = self.get_stats(urls, start_date, end_date, 'pageviews', display_mode=display_mode)
-        pagetime = self.get_stats(urls, start_date, end_date, 'time', display_mode=display_mode)
-
+        stats = self.get_stats(urls, start_date, end_date, display_mode=display_mode)
         context.update({
                 'display': display_mode,
                 'urls': urls,
-                'pageviews': pageviews, # Graph
-                'pagetime': pagetime, # Graph
+                'stats': stats, # Graph
                 'cumulative_stats_by_url': self.get_cumulative_stats_by_url(urls) # Table data
             })
         return context

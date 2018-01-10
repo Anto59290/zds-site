@@ -6184,11 +6184,12 @@ class StatTests(TestCase, TutorialTestMixin):
         self.client.login(username=self.user_author.username, password='hostel77')
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.context_data['display'], 'global')
+        self.assertEqual(resp.context_data['display'], 'details') # One URL content
         self.assertEqual(resp.context_data['urls'][0].name, self.published.title)
         # TODO self.assertEqual(resp.context_data['urls'][0].url, published.get_absolute_url())
-        # TODO test with more complex URLS ?
         # TODO test same thing with admin
+
+        # TODO test with more complex content/URLS ?
 
     def test_post_form(self):
         pass
@@ -6218,7 +6219,6 @@ class StatTests(TestCase, TutorialTestMixin):
         # TODO same with start date is 30 days before
 
         # TODO same with start date is 365 days before
-
 
 
     def test_query_parameter_url(self):
