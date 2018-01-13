@@ -1080,8 +1080,8 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def post(self, *args, **kwargs):
         self.public_content_object = self.get_public_object()
+        self.object = self.get_object()
         self.versioned_object = self.get_versioned_object()
-        # TODO missing self.object here !
         return super().post(*args, **kwargs)
 
     def get_form_kwargs(self):
@@ -1102,6 +1102,13 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
             return all_named_urls
 
     def get_content_urls(self):
+        # debug_urls = [
+        #     NamedUrl('Découverte de l Arduino', '/tutoriels/686/arduino-premiers-pas-en-informatique-embarquee/742_decouverte-de-larduino/', 1),
+        #     NamedUrl('Présentation', '/tutoriels/686/arduino-premiers-pas-en-informatique-embarquee/742_decouverte-de-larduino/3414_presentation-darduino/', 2),
+        #     NamedUrl('Quelques bases', '/tutoriels/686/arduino-premiers-pas-en-informatique-embarquee/742_decouverte-de-larduino/3415_quelques-bases-elementaires/', 2)
+        # ]
+        # return debug_urls
+
         content = self.versioned_object
         urls = [NamedUrl(content.title, content.get_absolute_url_online(), 0)]
         if content.has_extracts():
@@ -1113,11 +1120,17 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
                     urls.append(NamedUrl(subchild.title, subchild.get_absolute_url_online(), 2))
         return urls
 
-    def get_cumulative_stats_by_url(self, urls, start, end):
-        paths = [u.url for u in urls]
+    def config_ga_credentials(self):
+        # TODO Could raise JSONDecodeError is file is not properly formated
         credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
         http = credentials.authorize(Http())
         analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
+        return analytics
+
+    def get_cumulative_stats_by_url(self, urls, start, end):
+        paths = [u.url for u in urls]
+        analytics = self.config_ga_credentials()
+
         filters = []
         # Prepare filter to get all needed pages only
         for p in paths:
@@ -1138,9 +1151,9 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         ).execute()
 
         # Build an array of type arr[url] = {'pageviews': X, 'avgTimeOnPage': y}
-        response = response['reports'][0]['data']['rows']
+        rows = response['reports'][0]['data']['rows']
         data = {}
-        for r in response:
+        for r in rows:
             url = r['dimensions'][0]
             # avgTimeOnPage is convert to float then int to remove useless decimal part
             data[url] = {'pageviews': r['metrics'][0]['values'][0],
@@ -1159,11 +1172,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     def get_stats(self, urls, start, end, display_mode):
         nb_days = (end - start).days
         api_raw = []
-
-        # Could raise JSONDecodeError is file is not properly formated
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
-        http = credentials.authorize(Http())
-        analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
+        analytics = self.config_ga_credentials()
 
         if display_mode in ('global', 'details'):
             # Find level 0 url
@@ -1185,6 +1194,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
                 }]}
             ).execute()
 
+            # TODO if nothing is found ['rows'] will raise a KeyError
             rows = response['reports'][0]['data']['rows']
             stat_pageviews = []
             stat_avgtimeonpage = []
@@ -1276,6 +1286,9 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if not (self.is_author or self.is_staff):
+            raise PermissionDenied
+
         urls = self.get_urls_to_render()
         start_date, end_date = self.get_start_and_end_dates()
         display_mode = self.get_display_mode(urls)
