@@ -1127,31 +1127,9 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
         return analytics
 
-    def get_cumulative_stats_by_url(self, urls, start, end):
-        paths = [u.url for u in urls]
-        analytics = self.config_ga_credentials()
-
-        filters = []
-        # Prepare filter to get all needed pages only
-        for p in paths:
-            filters.append({
-                'operator': 'EXACT',
-                'dimensionName': 'ga:pagePath',
-                'expressions': p
-            })
-        response = analytics.reports().batchGet(
-            body={'reportRequests': [{
-                'viewId': self.VIEW_ID,
-                'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
-                'metrics': [{'expression': 'ga:pageviews'},
-                            {'expression': 'ga:avgTimeOnPage'}],
-                'dimensions': [{'name': 'ga:pagePath'}],
-                'dimensionFilterClauses': [{'filters': filters}],
-            }]}
-        ).execute()
-
+    def get_cumulative_stats_by_url(self, urls, report):
         # Build an array of type arr[url] = {'pageviews': X, 'avgTimeOnPage': y}
-        rows = response['reports'][0]['data']['rows']
+        rows = report['data']['rows']
         data = {}
         for r in rows:
             url = r['dimensions'][0]
@@ -1169,36 +1147,12 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
             })
         return api_raw
 
-    def get_stats(self, urls, start, end, display_mode):
-        nb_days = (end - start).days
+    def get_stats(self, urls, report, display_mode):
         api_raw = []
-        analytics = self.config_ga_credentials()
+        # TODO if nothing is found ['rows'] will raise a KeyError
+        rows = report['data']['rows']
 
         if display_mode in ('global', 'details'):
-            # Find level 0 url
-            if display_mode == 'global':
-                target_url = [u.url for u in urls if u.level == 0]
-            else:
-                target_url = urls[0].url
-
-            response = analytics.reports().batchGet(
-                body={'reportRequests': [{
-                    'viewId': self.VIEW_ID,
-                    'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
-                    'metrics': [{'expression': 'ga:pageviews'},
-                                {'expression': 'ga:avgTimeOnPage'}],
-                    'dimensions': [{'name': 'ga:date'},
-                                   {'name': 'ga:pagePath'}],
-                    'dimensionFilterClauses': [{'filters': [{
-                        'operator': 'EXACT',
-                        'dimensionName': 'ga:pagePath',
-                        'expressions': target_url
-                    }]}]
-                }]}
-            ).execute()
-
-            # TODO if nothing is found ['rows'] will raise a KeyError
-            rows = response['reports'][0]['data']['rows']
             stat_pageviews = []
             stat_avgtimeonpage = []
             for r in rows:
@@ -1213,30 +1167,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
                         'stats': {
                             'pageviews': stat_pageviews,
                             'avgTimeOnPage': stat_avgtimeonpage}}]
-
         else:
-            filters = []
-            # Prepare filter to get all needed pages only
-            for u in urls:
-                filters.append({
-                    'operator': 'EXACT',
-                    'dimensionName': 'ga:pagePath',
-                    'expressions': u.url
-                })
-            response = analytics.reports().batchGet(
-                body={'reportRequests': [{
-                    'viewId': self.VIEW_ID,
-                    'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
-                    'metrics': [{'expression': 'ga:pageviews'},
-                                {'expression': 'ga:avgTimeOnPage'}],
-                    'dimensions': [{'name': 'ga:date'},
-                                   {'name': 'ga:pagePath'}],
-                    'dimensionFilterClauses': [{'filters': filters}],
-                }]}
-            ).execute()
-
-            # Build an array of type arr[url] = [{'pageviews': X, 'avgTimeOnPage': y}]
-            rows = response['reports'][0]['data']['rows']
             data = {}
             for url in urls:
                 data[url.url] = {'stats': {'pageviews': [], 'avgTimeOnPage': []}}
@@ -1262,6 +1193,62 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
                 api_raw.append(element)
 
         return api_raw
+
+    def get_all_stats(self, urls, start, end, display_mode):
+        nb_days = (end - start).days
+        analytics = self.config_ga_credentials()
+
+        filters = []
+        # Prepare filter to get all needed pages only
+        for u in urls:
+            filters.append({
+                'operator': 'EXACT',
+                'dimensionName': 'ga:pagePath',
+                'expressions': u.url
+            })
+
+        reports = []
+
+        table_data_report = {
+            'viewId': self.VIEW_ID,
+            'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
+            'metrics': [{'expression': 'ga:pageviews'},
+                        {'expression': 'ga:avgTimeOnPage'}],
+            'dimensions': [{'name': 'ga:pagePath'}],
+            'dimensionFilterClauses': [{'filters': filters}],
+        }
+
+        if display_mode in ('global', 'details'):
+            # Find level 0 url
+            if display_mode == 'global':
+                target_url = [u.url for u in urls if u.level == 0]
+            else:
+                target_url = urls[0].url
+            filters = {
+                'operator': 'EXACT',
+                'dimensionName': 'ga:pagePath',
+                'expressions': target_url
+            }
+
+        graphs_data_report = {
+            'viewId': self.VIEW_ID,
+            'dateRanges': [{'startDate': start.strftime("%Y-%m-%d"), 'endDate': end.strftime("%Y-%m-%d")}],
+            'metrics': [{'expression': 'ga:pageviews'},
+                        {'expression': 'ga:avgTimeOnPage'}],
+            'dimensions': [{'name': 'ga:date'},
+                           {'name': 'ga:pagePath'}],
+            'dimensionFilterClauses': [{'filters': filters}]
+        }
+
+        response = analytics.reports().batchGet(
+            body={'reportRequests': [table_data_report, graphs_data_report]}
+        ).execute()
+
+        return (
+            self.get_stats(urls, response['reports'][1], display_mode),
+            self.get_cumulative_stats_by_url(urls, response['reports'][0])
+        )
+
 
     def get_start_and_end_dates(self):
         start_date = self.request.GET.get('start_date', None)
@@ -1295,11 +1282,10 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         urls = self.get_urls_to_render()
         start_date, end_date = self.get_start_and_end_dates()
         display_mode = self.get_display_mode(urls)
-        stats = self.get_stats(urls, start_date, end_date, display_mode=display_mode)
         context.update({
             'display': display_mode,
             'urls': urls,
-            'stats': stats,  # Graph
-            'cumulative_stats_by_url': self.get_cumulative_stats_by_url(urls, start_date, end_date)  # Table data
+            'stats': self.get_all_stats(urls, start_date, end_date, display_mode)[0],  # Graph
+            'cumulative_stats_by_url': self.get_all_stats(urls, start_date, end_date, display_mode)[1]  # Table data
         })
         return context
