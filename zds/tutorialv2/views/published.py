@@ -1075,7 +1075,7 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     CACHE_PATH = os.path.join(settings.BASE_DIR, '.ga-api-cache')
     SCOPES = ['https://www.googleapis.com/auth/analytics.readonly']
     DISCOVERY_URI = 'https://analyticsreporting.googleapis.com/$discovery/rest'
-    CLIENT_SECRETS_PATH = os.path.join(settings.BASE_DIR, 'api_analytics_secrets.json')  # Path to client_secrets.json file.
+    CLIENT_SECRETS_PATH = os.path.join(settings.BASE_DIR, 'api_analytics_secrets.json')
     VIEW_ID = 'ga:86962671'
 
     def post(self, *args, **kwargs):
@@ -1187,7 +1187,6 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
                     'pageviews': data_pageviews
                 })
 
-            api_raw = []
             for url in urls:
                 element = {'label': url.name, 'stats': data[url.url]['stats']}
                 api_raw.append(element)
@@ -1241,12 +1240,12 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         }
 
         response = analytics.reports().batchGet(
-            body={'reportRequests': [table_data_report, graphs_data_report]}
+            body={'reportRequests': [graphs_data_report, table_data_report]}
         ).execute()
 
         return (
-            self.get_stats(urls, response['reports'][1], display_mode),
-            self.get_cumulative_stats_by_url(urls, response['reports'][0])
+            self.get_stats(urls, response['reports'][0], display_mode),
+            self.get_cumulative_stats_by_url(urls, response['reports'][1])
         )
 
 
