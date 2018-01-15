@@ -1058,11 +1058,7 @@ class TagsListView(ListView):
 # TODO move imports
 from oauth2client.service_account import ServiceAccountCredentials
 from apiclient.discovery import build
-import httplib2
 from httplib2 import Http
-from oauth2client import client
-from oauth2client import file
-from oauth2client import tools
 
 class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     template_name = 'tutorialv2/stats/index.html'
@@ -1117,12 +1113,15 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         return urls
 
     def config_ga_credentials(self):
-        # TODO Could raise JSONDecodeError is file is not properly formated
-        # TODO Could raise ValueError if no key is found
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
-        http = credentials.authorize(Http(cache=self.CACHE_PATH))
-        analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
-        return analytics
+        try:
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(self.CLIENT_SECRETS_PATH, self.SCOPES)
+            http = credentials.authorize(Http(cache=self.CACHE_PATH))
+            analytics = build('analytics', 'v4', http=http, discoveryServiceUrl=self.DISCOVERY_URI)
+            return analytics
+        except (ValueError, FileNotFoundError) as e:
+            messages.error(self.request, _("Erreur de configuration de l'API Analytics. " \
+                                           "Merci de contacter l'équipe des développeurs. {}".format(type(e))))
+            return None
 
     def get_ga_filters_from_urls(self, urls):
         filters = [{'operator': 'EXACT',
@@ -1133,7 +1132,12 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
 
     def get_cumulative_stats_by_url(self, urls, report):
         # Build an array of type arr[url] = {'pageviews': X, 'avgTimeOnPage': y}
-        rows = report['data']['rows']
+        try:
+            rows = report['data']['rows']
+        except KeyError:
+            messages.error(self.request, _("Aucune données de statistiques cumulées disponibles"))
+            return []
+
         data = {}
         for r in rows:
             url = r['dimensions'][0]
@@ -1148,9 +1152,13 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         return api_raw
 
     def get_stats(self, urls, report, display_mode):
+        try:
+            rows = report['data']['rows']
+        except KeyError:
+            messages.error(self.request, _("Aucune données de statistiques détaillées disponibles"))
+            return []
+
         api_raw = []
-        # if nothing is found ['rows'] will raise a KeyError and will be catched later on
-        rows = report['data']['rows']
 
         if display_mode in ('global', 'details'):
             stat_pageviews = []
@@ -1194,15 +1202,10 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
     def get_all_stats(self, urls, start, end, display_mode):
         # nb_days = (end - start).days
         analytics = self.config_ga_credentials()
+        if not analytics:
+            return [[], []]
 
-        filters = []
-        # Prepare filter to get all needed pages only
-        for u in urls:
-            filters.append({
-                'operator': 'EXACT',
-                'dimensionName': 'ga:pagePath',
-                'expressions': u.url
-            })
+        filters = self.get_ga_filters_from_urls(urls)
 
         table_data_report = {
             'viewId': self.VIEW_ID,
@@ -1276,11 +1279,8 @@ class ContentStatisticsView(SingleOnlineContentDetailViewMixin, FormView):
         urls = self.get_urls_to_render()
         start_date, end_date = self.get_start_and_end_dates()
         display_mode = self.get_display_mode(urls)
-        all_stats = [None, None]
-        try:
-            all_stats = self.get_all_stats(urls, start_date, end_date, display_mode)
-        except KeyError:
-            messages.error(self.request, _("Aucune données de statistiques disponibles"))
+        all_stats = self.get_all_stats(urls, start_date, end_date, display_mode)
+
         context.update({
             'display': display_mode,
             'urls': urls,
